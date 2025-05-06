@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Injection Defense Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background-color: #1a365d;
+            color: white;
+        }
+        .attack-item {
+            border-left: 4px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .attack-item.high {
+            border-left-color: #e53e3e;
+        }
+        .attack-item.medium {
+            border-left-color: #ecc94b;
+        }
+        .attack-item.low {
+            border-left-color: #38a169;
+        }
+        .attack-item:hover {
+            background-color: #f7fafc;
+        }
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .badge-high {
+            background-color: #fed7d7;
+            color: #c53030;
+        }
+        .badge-medium {
+            background-color: #fefcbf;
+            color: #b7791f;
+        }
+        .badge-low {
+            background-color: #c6f6d5;
+            color: #2f855a;
+        }
+        .logo-text {
+            background: linear-gradient(90deg, #1a365d 0%, #2b6cb0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+        .scroll-container {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e0 #f7fafc;
+        }
+        .scroll-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scroll-container::-webkit-scrollbar-track {
+            background: #f7fafc;
+        }
+        .scroll-container::-webkit-scrollbar-thumb {
+            background-color: #cbd5e0;
+            border-radius: 20px;
+        }
+        .tab-active {
+            border-color: #4299e1;
+            color: #2b6cb0;
+            font-weight: 600;
+        }
+        .table-header {
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="header p-4 shadow-md sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center">
+                <div class="text-3xl font-bold mr-2">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">SQL Guardian</h1>
+                    <p class="text-sm opacity-75">Advanced SQL Injection Detection System</p>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <div class="hidden md:block">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </span>
+                        <input type="text" id="search" placeholder="Search attacks..." class="pl-10 pr-4 py-2 rounded-lg text-sm text-gray-700 focus:outline-none bg-gray-100 focus:bg-white focus:ring-2 focus:ring-blue-400">
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <button id="toggleTheme" class="p-2 rounded-full hover:bg-blue-700 focus:outline-none">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button id="refreshData" class="p-2 rounded-full hover:bg-blue-700 focus:outline-none">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6">
+        <!-- Dashboard Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="card p-6">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Total Attacks</p>
+                        <h2 class="text-3xl font-bold text-gray-800 mt-2 mb-1" id="totalAttacks">0</h2>
+                        <p class="text-sm"><span class="text-green-500" id="attackTrend">0%</span> from previous period</p>
+                    </div>
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">High Severity</p>
+                        <h2 class="text-3xl font-bold text-gray-800 mt-2 mb-1" id="highSeverity">0</h2>
+                        <p class="text-sm"><span class="text-red-500" id="highSeverityTrend">0%</span> increase detected</p>
+                    </div>
+                    <div class="bg-orange-100 p-3 rounded-full">
+                        <i class="fas fa-fire text-orange-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-6">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium">Latest Attack</p>
+                        <h2 class="text-xl font-bold text-gray-800 mt-2 mb-1" id="latestAttackTime">N/A</h2>
+                        <p class="text-sm text-gray-500" id="latestAttackType">No attacks detected</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-clock text-blue-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Attack Timeline Chart -->
+            <div class="card p-6 lg:col-span-2">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">Attack Timeline</h3>
+                    <div class="flex space-x-2">
+                        <button class="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 time-filter active" data-time="day">Day</button>
+                        <button class="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 time-filter" data-time="week">Week</button>
+                        <button class="text-sm px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 time-filter" data-time="month">Month</button>
+                    </div>
+                </div>
+                <div class="w-full h-64">
+                    <canvas id="attackTimelineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Attack Types Distribution -->
+            <div class="card p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-6">Attack Types</h3>
+                <div class="w-full h-64">
+                    <canvas id="attackTypesChart"></canvas>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                            <span class="text-sm text-gray-600">Union Based</span>
+                        </div>
+                        <span class="text-sm font-medium" id="unionPercent">0%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                            <span class="text-sm text-gray-600">Boolean Based</span>
+                        </div>
+                        <span class="text-sm font-medium" id="booleanPercent">0%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                            <span class="text-sm text-gray-600">Error Based</span>
+                        </div>
+                        <span class="text-sm font-medium" id="errorPercent">0%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                            <span class="text-sm text-gray-600">Time Based</span>
+                        </div>
+                        <span class="text-sm font-medium" id="timePercent">0%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                            <span class="text-sm text-gray-600">Other</span>
+                        </div>
+                        <span class="text-sm font-medium" id="otherPercent">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Attacks & Analysis -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            <!-- Recent Attacks List -->
+            <div class="card lg:col-span-2">
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800">Recent Attacks</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Query</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attacksList" class="divide-y divide-gray-100">
+                            <!-- Attack items will be populated here -->
+                            <tr>
+                                <td colspan="6" class="px-6 py-4 text-center text-gray-500">No attack data available</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex justify-between items-center">
+                    <p class="text-sm text-gray-500" id="attacksCount">Showing 0 attacks</p>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 rounded border border-gray-200 text-sm hover:bg-gray-50" id="prevPage" disabled>Previous</button>
+                        <button class="px-3 py-1 rounded border border-gray-200 text-sm hover:bg-gray-50" id="nextPage" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POS Breakdown Panel -->
+            <div class="card">
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-800">POS Analysis</h3>
+                </div>
+                <div class="p-6" id="posAnalysisContainer">
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold text-gray-600 mb-2">Part-of-Speech Distribution in Attacks</h4>
+                        <div class="h-64">
+                            <canvas id="posDistributionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <h4 class="text-sm font-semibold text-gray-600 mb-3">SQL Keywords Analysis</h4>
+                        <div id="keywordsContainer" class="flex flex-wrap gap-2">
+                            <span class="badge bg-blue-100 text-blue-800">SELECT</span>
+                            <span class="badge bg-blue-100 text-blue-800">UNION</span>
+                            <span class="badge bg-blue-100 text-blue-800">FROM</span>
+                            <span class="badge bg-blue-100 text-blue-800">WHERE</span>
+                            <span class="badge bg-blue-100 text-blue-800">OR</span>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-600 mb-3">Detection Pattern</h4>
+                        <div class="bg-gray-50 p-3 rounded-md text-sm">
+                            <code id="detectionPattern" class="text-xs break-all whitespace-pre-wrap">No attack selected</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Detail Modal -->
+        <div id="attackDetailModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+            <div class="bg-white rounded-lg w-full max-w-4xl mx-4">
+                <div class="flex justify-between items-center p-6 border-b">
+                    <h3 class="text-xl font-bold text-gray-800">Attack Details</h3>
+                    <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h4 class="text-md font-semibold mb-4">Basic Information</h4>
+                            <div class="space-y-3">
+                                <div class="flex">
+                                    <span class="text-gray-500 w-32">Timestamp:</span>
+                                    <span id="modal-timestamp" class="font-medium"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="text-gray-500 w-32">IP Address:</span>
+                                    <span id="modal-ip" class="font-medium"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="text-gray-500 w-32">User Agent:</span>
+                                    <span id="modal-useragent" class="font-medium text-sm"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="text-gray-500 w-32">Attack Type:</span>
+                                    <span id="modal-type" class="font-medium"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="text-gray-500 w-32">Severity:</span>
+                                    <span id="modal-severity" class="font-medium"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-md font-semibold mb-4">Query Information</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <span class="text-gray-500 block mb-2">Original Query:</span>
+                                    <div class="bg-gray-50 p-3 rounded-md">
+                                        <code id="modal-query" class="text-sm break-all whitespace-pre-wrap"></code>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500 block mb-2">Sanitized Query:</span>
+                                    <div class="bg-gray-50 p-3 rounded-md">
+                                        <code id="modal-sanitized" class="text-sm break-all whitespace-pre-wrap"></code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h4 class="text-md font-semibold mb-4">POS Analysis</h4>
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <div id="modal-pos-tokens" class="text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h4 class="text-md font-semibold mb-4">Detection Explanation</h4>
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <p id="modal-explanation" class="text-sm"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end p-6 border-t">
+                    <button id="blockIPBtn" class="bg-red-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-600 mr-2">Block IP</button>
+                    <button id="dismissBtn" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Connect to Socket.io
+        const socket = io();
+        
+        // Initialize charts
+        let attackTimelineChart, attackTypesChart, posDistributionChart;
+        let attacksData = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            fetchAttackData();
+            setupEventListeners();
+        });
+
+        function initCharts() {
+            // Attack Timeline Chart
+            const timelineCtx = document.getElementById('attackTimelineChart').getContext('2d');
+            attackTimelineChart = new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: Array(24).fill(0).map((_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Attacks',
+                        data: Array(24).fill(0),
+                        borderColor: '#3182ce',
+                        backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Attack Types Chart
+            const typesCtx = document.getElementById('attackTypesChart').getContext('2d');
+            attackTypesChart = new Chart(typesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Union Based', 'Boolean Based', 'Error Based', 'Time Based', 'Other'],
+                    datasets: [{
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            '#f56565', // Red
+                            '#4299e1', // Blue
+                            '#ecc94b', // Yellow
+                            '#48bb78', // Green
+                            '#9f7aea'  // Purple
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+
+            // POS Distribution Chart
+            const posCtx = document.getElementById('posDistributionChart').getContext('2d');
+            posDistributionChart = new Chart(posCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['NN', 'VB', 'JJ', 'RB', 'IN', 'DT', 'Other'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [0, 0, 0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            'rgba(66, 153, 225, 0.6)', // Blue
+                            'rgba(72, 187, 120, 0.6)', // Green
+                            'rgba(237, 100, 166, 0.6)', // Pink
+                            'rgba(159, 122, 234, 0.6)', // Purple
+                            'rgba(246, 173, 85, 0.6)',  // Orange
+                            'rgba(113, 128, 150, 0.6)', // Gray
+                            'rgba(160, 174, 192, 0.6)'  // Light Gray
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function fetchAttackData() {
+            // In a real application, you would fetch this data from your server
+            // For now, we'll use mock data for demonstration
+            
+            // Mock data for demonstration
+            attacksData = generateMockData(50);
+            
+            // Update dashboard with mock data
+            updateDashboardStats();
+            updateAttacksList();
+            updateCharts();
+        }
+
+        function generateMockData(count) {
+            const attackTypes = ['Union Based', 'Boolean Based', 'Error Based', 'Time Based', 'Other'];
+            const severities = ['high', 'medium', 'low'];
+            const mockData = [];
+            
+            const now = new Date();
+            
+            for (let i = 0; i < count; i++) {
+                const type = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+                const severity = severities[Math.floor(Math.random() * severities.length)];
+                const pastHours = Math.floor(Math.random() * 168); // Past week
+                const timestamp = new Date(now.getTime() - (pastHours * 60 * 60 * 1000));
+                
+                let query = '';
+                let posAnalysis = {};
+                
+                if (type === 'Union Based') {
+                    query = "SELECT * FROM users WHERE username = 'admin' UNION SELECT username, password FROM users--";
+                    posAnalysis = {
+                        'SELECT': 'VB',
+                        '*': 'NN',
+                        'FROM': 'IN',
+                        'users': 'NNS',
+                        'WHERE': 'WRB',
+                        'username': 'NN',
+                        '=': 'SYM',
+                        'admin': 'NN',
+                        'UNION': 'NN',
+                        'password': 'NN',
+                        '--': 'SYM'
+                    };
+                } else if (type === 'Boolean Based') {
+                    query = "SELECT * FROM products WHERE category = 'electronics' AND 1=1--";
+                    posAnalysis = {
+                        'SELECT': 'VB',
+                        '*': 'NN',
+                        'FROM': 'IN',
+                        'products': 'NNS',
+                        'WHERE': 'WRB',
+                        'category': 'NN',
+                        '=': 'SYM',
+                        'electronics': 'NN',
+                        'AND': 'CC',
+                        '1': 'CD',
+                        '--': 'SYM'
+                    };
+                } else if (type === 'Error Based') {
+                    query = "SELECT * FROM users WHERE id = 1 OR extractvalue(1, concat(0x7e, (SELECT password FROM users)))";
+                    posAnalysis = {
+                        'SELECT': 'VB',
+                        '*': 'NN',
+                        'FROM': 'IN',
+                        'users': 'NNS',
+                        'WHERE': 'WRB',
+                        'id': 'NN',
+                        '=': 'SYM',
+                        '1': 'CD',
+                        'OR': 'CC',
+                        'extractvalue': 'NN',
+                        'concat': 'NN',
+                        'password': 'NN'
+                    };
+                } else if (type === 'Time Based') {
+                    query = "SELECT * FROM products WHERE id = 1 AND IF(1=1, SLEEP(5), 0)";
+                    posAnalysis = {
+                        'SELECT': 'VB',
+                        '*': 'NN',
+                        'FROM': 'IN',
+                        'products': 'NNS',
+                        'WHERE': 'WRB',
+                        'id': 'NN',
+                        '=': 'SYM',
+                        '1': 'CD',
+                        'AND': 'CC',
+                        'IF': 'IN',
+                        'SLEEP': 'NN',
+                        '5': 'CD',
+                        '0': 'CD'
+                    };
+                } else {
+                    query = "admin'; DROP TABLE users; --";
+                    posAnalysis = {
+                        'admin': 'NN',
+                        'DROP': 'VB',
+                        'TABLE': 'NN',
+                        'users': 'NNS',
+                        '--': 'SYM'
+                    };
+                }
+                
+                mockData.push({
+                    id: i + 1,
+                    timestamp: timestamp,
+                    ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    type: type,
+                    query: query,
+                    sanitizedQuery: query.replace(/UNION|DROP|--/gi, '***'),
+                    severity: severity,
+                    posAnalysis: posAnalysis,
+                    explanation: `Detected ${type} SQL injection attempt using POS analysis of suspicious tokens and SQL syntax patterns.`
+                });
+            }
+            
+            return mockData;
+        }
+
+        function updateDashboardStats() {
+            // Update total attacks count
+            document.getElementById('totalAttacks').textContent = attacksData.length;
+            document.getElementById('attackTrend').textContent = '+12%';
+            
+            // Update high severity count
+            const highSeverityCount = attacksData.filter(attack => attack.severity === 'high').length;
+            document.getElementById('highSeverity').textContent = highSeverityCount;
+            document.getElementById('highSeverityTrend').textContent = '+8%';
+            
+            // Update latest attack info
+            if (attacksData.length > 0) {
+                // Sort by timestamp descending
+                const sortedAttacks = [...attacksData].sort((a, b) => b.timestamp - a.timestamp);
+                const latestAttack = sortedAttacks[0];
+                
+                document.getElementById('latestAttackTime').textContent = formatTimestamp(latestAttack.timestamp);
+                document.getElementById('latestAttackType').textContent = latestAttack.type;
+            }
+        }
+
+        function updateAttacksList() {
+            const tbody = document.getElementById('attacksList');
+            tbody.innerHTML = '';
+            
+            // Sort attacks by timestamp (newest first)
+            const sortedAttacks = [...attacksData].sort((a, b) => b.timestamp - a.timestamp);
+            
+            // Calculate pagination
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedAttacks = sortedAttacks.slice(startIndex, endIndex);
+            
+            if (paginatedAttacks.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">No attack data available</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Update attacks list
+            paginatedAttacks.forEach(attack => {
+                const tr = document.createElement('tr');
+                tr.className = `attack-item ${attack.severity} hover:bg-gray-50`;
+                tr.setAttribute('data-id', attack.id);
+                
+                // Create timestamp cell
+                const timeCell = document.createElement('td');
+                timeCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+                timeCell.textContent = formatTimestamp(attack.timestamp);
+                tr.appendChild(timeCell);
+                
+                // Create IP address cell
+                const ipCell = document.createElement('td');
+                ipCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900';
+                ipCell.textContent = attack.ipAddress;
+                tr.appendChild(ipCell);
+                
+                // Create attack type cell
+                const typeCell = document.createElement('td');
+                typeCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+                typeCell.textContent = attack.type;
+                tr.appendChild(typeCell);
+                
+                // Create query cell
+                const queryCell = document.createElement('td');
+                queryCell.className = 'px-6 py-4 text-sm text-gray-500 max-w-xs truncate';
+                queryCell.textContent = attack.query;
+                tr.appendChild(queryCell);
+                
+                // Create severity cell
+                const severityCell = document.createElement('td');
+                severityCell.className = 'px-6 py-4 whitespace-nowrap';
+                const severityBadge = document.createElement('span');
+                severityBadge.className = `badge badge-${attack.severity}`;
+                severityBadge.textContent = attack.severity.charAt(0).toUpperCase() + attack.severity.slice(1);
+                severityCell.appendChild(severityBadge);
+                tr.appendChild(severityCell);
+                
+                // Create actions cell
+                const actionsCell = document.createElement('td');
+                actionsCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+                
+                const viewBtn = document.createElement('button');
+                viewBtn.className = 'text-blue-600 hover:text-blue-900';
+                viewBtn.innerHTML = '<i class="fas fa-eye mr-1"></i> View';
+                viewBtn.onclick = () => showAttackDetails(attack.id);
+                
+                actionsCell.appendChild(viewBtn);
+                tr.appendChild(actionsCell);
+                
+                tbody.appendChild(tr);
+            });
+            
+            // Update pagination info
+            document.getElementById('attacksCount').textContent = `Showing ${startIndex + 1}-${Math.min(endIndex, sortedAttacks.length)} of ${sortedAttacks.length} attacks`;
+            
+            // Update pagination buttons
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = endIndex >= sortedAttacks.length;
+        }
+
+        function updateCharts() {
+            // Update attack timeline chart
+            updateTimelineChart('day');
+            
+            // Update attack types chart
+            const attackCounts = {
+                'Union Based': 0,
+                'Boolean Based': 0,
+                'Error Based': 0,
+                'Time Based': 0,
+                'Other': 0
+            };
+            
+            attacksData.forEach(attack => {
+                if (attackCounts.hasOwnProperty(attack.type)) {
+                    attackCounts[attack.type]++;
+                } else {
+                    attackCounts['Other']++;
+                }
+            });
+            
+            attackTypesChart.data.datasets[0].data = [
+                attackCounts['Union Based'],
+                attackCounts['Boolean Based'],
+                attackCounts['Error Based'],
+                attackCounts['Time Based'],
+                attackCounts['Other']
+            ];
+            attackTypesChart.update();
+            
+            // Update percentage displays
+            const total = attacksData.length || 1; // Avoid division by zero
+            document.getElementById('unionPercent').textContent = `${Math.round((attackCounts['Union Based'] / total) * 100)}%`;
+            document.getElementById('booleanPercent').textContent = `${Math.round((attackCounts['Boolean Based'] / total) * 100)}%`;
+            document.getElementById('errorPercent').textContent = `${Math.round((attackCounts['Error Based'] / total) * 100)}%`;
+            document.getElementById('timePercent').textContent = `${Math.round((attackCounts['Time Based'] / total) * 100)}%`;
+            document.getElementById('otherPercent').textContent = `${Math.round((attackCounts['Other'] / total) * 100)}%`;
+            
+            // Update POS distribution chart
+            updatePOSDistributionChart();
+        }
+
+        function updateTimelineChart(timespan) {
+            let labels = [];
+            let data = [];
+            
+            const now = new Date();
+            
+            if (timespan === 'day') {
+                // Last 24 hours by hour
+                labels = Array(24).fill(0).map((_, i) => `${i}:00`);
+                data = Array(24).fill(0);
+                
+                attacksData.forEach(attack => {
+                    const attackDate = new Date(attack.timestamp);
+                    const hoursDiff = Math.floor((now - attackDate) / (1000 * 60 * 60));
+                    
+                    if (hoursDiff < 24) {
+                        const hourIndex = attackDate.getHours();
+                        data[hourIndex]++;
+                    }
+                });
+            } else if (timespan === 'week') {
+                // Last 7 days
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                labels = Array(7).fill(0).map((_, i) => {
+                    const d = new Date(now);
+                    d.setDate(d.getDate() - (6 - i));
+                    return days[d.getDay()];
+                });
+                data = Array(7).fill(0);
+                
+                attacksData.forEach(attack => {
+                    const attackDate = new Date(attack.timestamp);
+                    const daysDiff = Math.floor((now - attackDate) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysDiff < 7) {
+                        const dayIndex = 6 - daysDiff;
+                        data[dayIndex]++;
+                    }
+                });
+            } else if (timespan === 'month') {
+                // Last 4 weeks
+                labels = Array(4).fill(0).map((_, i) => `Week ${4-i}`);
+                data = Array(4).fill(0);
+                
+                attacksData.forEach(attack => {
+                    const attackDate = new Date(attack.timestamp);
+                    const daysDiff = Math.floor((now - attackDate) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysDiff < 28) {
+                        const weekIndex = Math.floor(daysDiff / 7);
+                        if (weekIndex < 4) {
+                            data[3 - weekIndex]++;
+                        }
+                    }
+                });
+            }
+            
+            attackTimelineChart.data.labels = labels;
+            attackTimelineChart.data.datasets[0].data = data;
+            attackTimelineChart.update();
+        }
+
+        function updatePOSDistributionChart() {
+            const posCount = {
+                'NN': 0,  // Noun
+                'VB': 0,  // Verb
+                'JJ': 0,  // Adjective
+                'RB': 0,  // Adverb
+                'IN': 0,  // Preposition
+                'DT': 0,  // Determiner
+                'Other': 0
+            };
+            
+            // Count POS tags across all attacks
+            attacksData.forEach(attack => {
+                if (attack.posAnalysis) {
+                    Object.values(attack.posAnalysis).forEach(pos => {
+                        // Get the base POS tag without modifiers (e.g., 'NNS' -> 'NN')
+                        const basePos = pos.substring(0, 2);
+                        
+                        if (posCount.hasOwnProperty(basePos)) {
+                            posCount[basePos]++;
+                        } else {
+                            posCount['Other']++;
+                        }
+                    });
+                }
+            });
+            
+            posDistributionChart.data.datasets[0].data = [
+                posCount['NN'],
+                posCount['VB'],
+                posCount['JJ'],
+                posCount['RB'],
+                posCount['IN'],
+                posCount['DT'],
+                posCount['Other']
+            ];
+            posDistributionChart.update();
+        }
+
+        function showAttackDetails(attackId) {
+            const attack = attacksData.find(a => a.id === attackId);
+            if (!attack) return;
+            
+            // Populate modal with attack details
+            document.getElementById('modal-timestamp').textContent = formatTimestamp(attack.timestamp, true);
+            document.getElementById('modal-ip').textContent = attack.ipAddress;
+            document.getElementById('modal-useragent').textContent = attack.userAgent;
+            document.getElementById('modal-type').textContent = attack.type;
+            
+            const severityElem = document.getElementById('modal-severity');
+            severityElem.textContent = attack.severity.charAt(0).toUpperCase() + attack.severity.slice(1);
+            severityElem.className = `font-medium text-${attack.severity === 'high' ? 'red' : attack.severity === 'medium' ? 'yellow' : 'green'}-600`;
+            
+            document.getElementById('modal-query').textContent = attack.query;
+            document.getElementById('modal-sanitized').textContent = attack.sanitizedQuery;
+            
+            // Display POS tokens
+            const tokensContainer = document.getElementById('modal-pos-tokens');
+            tokensContainer.innerHTML = '';
+            
+            if (attack.posAnalysis) {
+                Object.entries(attack.posAnalysis).forEach(([token, pos]) => {
+                    const tokenSpan = document.createElement('span');
+                    tokenSpan.className = 'inline-block bg-white border rounded px-2 py-1 m-1';
+                    tokenSpan.innerHTML = `<span class="font-medium">${token}</span> <span class="text-xs text-gray-500">(${pos})</span>`;
+                    tokensContainer.appendChild(tokenSpan);
+                });
+            }
+            
+            // Set detection explanation
+            document.getElementById('modal-explanation').textContent = attack.explanation;
+            
+            // Display the modal
+            document.getElementById('attackDetailModal').classList.remove('hidden');
+        }
+
+        function setupEventListeners() {
+            // Time filter buttons
+            document.querySelectorAll('.time-filter').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('.time-filter').forEach(btn => btn.classList.remove('active', 'bg-blue-100', 'text-blue-800'));
+                    this.classList.add('active', 'bg-blue-100', 'text-blue-800');
+                    updateTimelineChart(this.dataset.time);
+                });
+            });
+            
+            // Pagination buttons
+            document.getElementById('prevPage').addEventListener('click', function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updateAttacksList();
+                }
+            });
+            
+            document.getElementById('nextPage').addEventListener('click', function() {
+                const maxPage = Math.ceil(attacksData.length / itemsPerPage);
+                if (currentPage < maxPage) {
+                    currentPage++;
+                    updateAttacksList();
+                }
+            });
+            
+            // Modal close button
+            document.getElementById('closeModal').addEventListener('click', function() {
+                document.getElementById('attackDetailModal').classList.add('hidden');
+            });
+            
+            // Dismiss button in modal
+            document.getElementById('dismissBtn').addEventListener('click', function() {
+                document.getElementById('attackDetailModal').classList.add('hidden');
+            });
+            
+            // Block IP button in modal
+            document.getElementById('blockIPBtn').addEventListener('click', function() {
+                alert('IP blocking feature would be implemented here');
+                document.getElementById('attackDetailModal').classList.add('hidden');
+            });
+            
+            // Refresh data button
+            document.getElementById('refreshData').addEventListener('click', function() {
+                this.classList.add('animate-spin');
+                setTimeout(() => {
+                    fetchAttackData();
+                    this.classList.remove('animate-spin');
+                }, 500);
+            });
+            
+            // Search input
+            document.getElementById('search').addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                if (searchTerm.length >= 2) {
+                    attacksData = generateMockData(50).filter(attack => {
+                        return attack.query.toLowerCase().includes(searchTerm) ||
+                               attack.ipAddress.toLowerCase().includes(searchTerm) ||
+                               attack.type.toLowerCase().includes(searchTerm);
+                    });
+                } else {
+                    attacksData = generateMockData(50);
+                }
+                currentPage = 1;
+                updateDashboardStats();
+                updateAttacksList();
+                updateCharts();
+            });
+            
+            // Initialize socket listeners
+            socket.on('new-attack', function(attack) {
+                // In a real application, this would add new attack data from the server
+                attacksData.unshift(attack);
+                updateDashboardStats();
+                updateAttacksList();
+                updateCharts();
+                
+                // Show notification
+                showNotification(`New ${attack.severity} severity attack detected!`);
+            });
+        }
+
+        function formatTimestamp(timestamp, includeSeconds = false) {
+            const date = new Date(timestamp);
+            const options = {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            
+            if (includeSeconds) {
+                options.second = '2-digit';
+            }
+            
+            return date.toLocaleString('en-US', options);
+        }
+
+        function showNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded shadow-lg z-50 animate-fade-in';
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.classList.add('animate-fade-out');
+                setTimeout(() => {
+                    notification.remove();
+                }, 500);
+            }, 5000);
+        }
+
+        // Mock receiving a new attack (for demonstration)
+        setTimeout(() => {
+            const mockAttack = generateMockData(1)[0];
+            socket.emit('new-attack', mockAttack);
+        }, 30000);
+    </script>
+</body>
+</html>

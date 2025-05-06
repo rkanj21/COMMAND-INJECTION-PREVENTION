@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Injection Prevention System</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 50px;
+        }
+        .jumbotron {
+            background-color: #f8f9fa;
+            padding: 2rem;
+        }
+        .features {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .feature-card {
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+        }
+        .feature-card h3 {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="jumbotron text-center">
+            <h1 class="display-4">Command Injection Prevention System</h1>
+            <p class="lead">Protecting your applications from command injection attacks using NLP POS tagging</p>
+            <hr class="my-4">
+            <p>This secure application demonstrates how to prevent command injection attacks using Part-of-Speech tagging with Natural Language Processing.</p>
+            <div class="mt-4">
+                <a href="{{ url_for('login') }}" class="btn btn-primary mr-2">Login</a>
+                <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <h3>NLP Detection</h3>
+                        <p>Uses Part-of-Speech tagging to identify and prevent potential command injection attacks by analyzing sentence structure.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <h3>Pattern Recognition</h3>
+                        <p>Identifies potentially dangerous command patterns, operators, and special characters used in command injection attacks.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="feature-card">
+                        <h3>Secure Input Handling</h3>
+                        <p>All user inputs are processed and validated before being used in application operations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mb-5">
+            <h2>How It Works</h2>
+            <p class="lead">The system analyzes input text using POS tagging to identify command patterns and potentially malicious syntax.</p>
+            <p>When a user enters text, the system tokenizes the input, assigns part-of-speech tags to each word, and analyzes the relationships between words to detect potential command injection patterns.</p>
+        </div>
+    </div>
+
+    <footer class="bg-light py-3">
+        <div class="container text-center">
+            <p>Command Injection Prevention System &copy; 2025</p>
+        </div>
+    </footer>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
